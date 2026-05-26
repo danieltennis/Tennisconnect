@@ -282,7 +282,7 @@ def require_auth(f):
     return w
 
 def haversine(lat1, lng1, lat2, lng2):
-    if not all([lat1, lng1, lat2, lng2]): return 9999
+    if any(x is None for x in [lat1, lng1, lat2, lng2]): return 9999
     R = 6371
     dlat = math.radians(lat2 - lat1); dlng = math.radians(lng2 - lng1)
     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
@@ -599,15 +599,17 @@ def clubs():
     db = get_db()
     me_row = db.execute("SELECT lat,lng FROM users WHERE id=?", (request.user_id,)).fetchone()
     my_lat, my_lng = me_row["lat"], me_row["lng"]
+    no_location = not my_lat and not my_lng
     rows = db.execute("SELECT * FROM clubs").fetchall()
     db.close()
     out = []
     for r in rows:
         dm = haversine(my_lat, my_lng, r["lat"], r["lng"])
-        if dm <= radius:
-            c = row_to_dict(r); c["dist_me"] = round(dm, 1)
+        if no_location or dm <= radius:
+            c = row_to_dict(r)
+            c["dist_me"] = round(dm, 1) if not no_location else None
             out.append(c)
-    out.sort(key=lambda x: x["dist_me"])
+    out.sort(key=lambda x: (x["dist_me"] is None, x["dist_me"] or 0))
     return jsonify(out)
 
 # ─── MATCH REQUESTS (direct + open posts) ────────────────────────────────────

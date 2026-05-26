@@ -900,10 +900,10 @@ async function loadClubs(){
       const popupHtml = `
         <div style="font-family:'DM Sans',sans-serif;min-width:200px">
           <div style="font-family:'Bebas Neue',Impact,sans-serif;font-size:18px;color:#1a6b3a;letter-spacing:.5px;margin-bottom:6px;line-height:1.1">${safeName}</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;color:#3a4a3a">
+          ${c.dist_me != null ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;color:#3a4a3a">
             <span style="color:#e8850a">📍</span>
             <b style="color:#0e1f12">${c.dist_me} km</b> van jou
-          </div>
+          </div>` : ''}
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;color:#3a4a3a">
             <span style="color:#e8850a">🕐</span> ${escapeHtml(hours)}
           </div>
@@ -913,8 +913,9 @@ async function loadClubs(){
           ${c.address ? `<div style="font-size:11px;color:#6b7c6a;margin-bottom:8px">${escapeHtml(c.address)}</div>` : ''}
           <button data-club="${safeName}" onclick="usePostClub(this.dataset.club)" style="width:100%;background:#1a6b3a;color:#fff;border:0;padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit">🎾 Plan match hier</button>
         </div>`;
+      const distTip = c.dist_me != null ? ` · ${c.dist_me} km` : '';
       const m = L.marker([c.lat,c.lng],{icon, title:c.name||''})
-        .bindTooltip(`${safeName} · ${c.dist_me} km`, {direction:'top', offset:[0,-12], className:'club-label', opacity:0.95})
+        .bindTooltip(`${safeName}${distTip}`, {direction:'top', offset:[0,-12], className:'club-label', opacity:0.95})
         .bindPopup(popupHtml, {maxWidth:260, className:'club-popup'})
         .addTo(MAP);
       m.on('click', function(){ this.openPopup(); });
@@ -1213,7 +1214,7 @@ async function fillClubSelect(preselect){
   if (!CLUBS_CACHE.length) await fetchClubs();
   const sorted = [...CLUBS_CACHE].sort((a,b)=>(a.dist_me||999)-(b.dist_me||999));
   let opts = '<option value="">— Kies een club —</option>';
-  opts += sorted.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} · ${c.dist_me} km</option>`).join('');
+  opts += sorted.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}${c.dist_me != null ? ' · '+c.dist_me+' km' : ''}</option>`).join('');
   sel.innerHTML = opts;
   if (preselect) sel.value = preselect;
 }
