@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  tennisconnect:
+    build: .
+    image: tennisconnect:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - TC_SECRET=${TC_SECRET}
+      - TC_VAPID_PUBLIC=${TC_VAPID_PUBLIC:-}
+      - TC_VAPID_PRIVATE=${TC_VAPID_PRIVATE:-}
+      - TC_VAPID_CONTACT=${TC_VAPID_CONTACT:-mailto:dev@tennisconnect.local}
+      - FLASK_DEBUG=0
+    volumes:
+      - ./db:/app/db

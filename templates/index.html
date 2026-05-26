@@ -1,0 +1,1709 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TennisConnect — Vind jouw tegenstander</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%BE%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a6b3a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g:#1a6b3a; --g2:#0f4a27; --g3:#23824a;
+  --lime:#b5e435; --lime2:#d4f065;
+  --bg:#f4f7f0; --surf:#ffffff; --surf2:#fafffe;
+  --text:#0e1f12; --muted:#6b7c6a;
+  --border:#dde8d8; --border2:#c4d3bd;
+  --red:#d84a2e; --amber:#e8850a; --blue:#2c6dc7;
+  --shadow:0 2px 10px rgba(0,0,0,.06);
+  --shadow-lg:0 8px 28px rgba(0,0,0,.12);
+  --r:12px; --r-lg:18px; --r-full:9999px;
+  --ff:'DM Sans',-apple-system,system-ui,sans-serif;
+  --fd:'Bebas Neue',Impact,sans-serif;
+}
+html,body{height:100%}
+body{font-family:var(--ff);background:var(--bg);color:var(--text);
+     -webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--g);text-decoration:none}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px}
+img{max-width:100%;display:block}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:var(--r);
+     font-weight:600;background:var(--g);color:#fff;transition:transform .12s,filter .12s;
+     box-shadow:var(--shadow);min-height:42px;justify-content:center}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:transparent;color:var(--g);border:1.5px solid var(--border2);box-shadow:none}
+.btn.lime{background:var(--lime);color:var(--g2)}
+.btn.red{background:var(--red);color:#fff}
+.btn.sm{padding:6px 12px;min-height:32px;font-size:13px;border-radius:8px}
+.btn.lg{padding:14px 22px;min-height:50px;font-size:16px;border-radius:14px}
+.btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=time],
+input[type=number],select,textarea{
+  width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;
+  background:var(--surf);color:var(--text);outline:none;transition:border-color .12s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--g)}
+textarea{min-height:80px;resize:vertical;font-family:inherit}
+label{display:block;font-weight:600;margin-bottom:6px;font-size:13px;color:var(--muted)}
+
+/* ── Layout ── */
+.app{display:flex;flex-direction:column;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;
+        padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--border);
+        position:sticky;top:0;z-index:80}
+.logo{font-family:var(--fd);font-size:24px;letter-spacing:.5px;color:var(--g)}
+.logo span{color:var(--lime);background:var(--g);padding:1px 6px;border-radius:6px;font-size:18px;margin-left:4px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+        background-size:cover;background-position:center;overflow:hidden;cursor:pointer;
+        border:2px solid var(--lime)}
+
+main{flex:1;padding-bottom:80px}
+
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surf);
+            border-top:1px solid var(--border);display:flex;justify-content:space-around;
+            padding:6px 0 max(6px,env(safe-area-inset-bottom));z-index:70;
+            box-shadow:0 -2px 12px rgba(0,0,0,.04)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+         padding:6px 4px;color:var(--muted);font-size:11px;font-weight:600;
+         transition:color .12s}
+.nav-btn svg{width:22px;height:22px;stroke-width:2;fill:none;stroke:currentColor}
+.nav-btn.active{color:var(--g)}
+.nav-btn.badge{position:relative}
+.nav-btn .dot{position:absolute;top:4px;right:calc(50% - 14px);width:8px;height:8px;
+              background:var(--red);border-radius:50%;border:1.5px solid var(--surf);display:none}
+.nav-btn.has-unread .dot{display:block}
+
+/* ── Views ── */
+.view{display:none;padding:16px;animation:fadeIn .25s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── Auth screen ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+           padding:24px;background:linear-gradient(135deg,#1a6b3a 0%,#0f4a27 100%)}
+.auth-card{background:var(--surf);border-radius:20px;padding:28px;max-width:420px;width:100%;
+           box-shadow:var(--shadow-lg)}
+.auth-hero{text-align:center;margin-bottom:20px}
+.auth-hero .logo{font-size:36px}
+.auth-hero p{color:var(--muted);font-size:14px;margin-top:8px;line-height:1.5}
+.auth-tabs{display:flex;gap:0;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:18px}
+.auth-tabs button{flex:1;padding:10px;border-radius:9px;font-weight:600;color:var(--muted);transition:.12s}
+.auth-tabs button.on{background:var(--surf);color:var(--g);box-shadow:var(--shadow)}
+.field{margin-bottom:14px}
+.error{background:#fbe4dd;color:var(--red);padding:10px 12px;border-radius:10px;
+       font-size:13px;margin-bottom:12px;display:none}
+.error.show{display:block}
+.legal{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5}
+.legal a{color:var(--g);text-decoration:underline}
+
+/* ── Home view ── */
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.chip{padding:7px 14px;border-radius:var(--r-full);background:var(--surf);
+      border:1.5px solid var(--border);color:var(--text);font-size:13px;font-weight:600;
+      cursor:pointer;transition:.12s;white-space:nowrap}
+.chip.on{background:var(--g);color:#fff;border-color:var(--g)}
+.chip svg{width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px}
+
+.map-wrap{height:340px;border-radius:var(--r-lg);overflow:hidden;
+          box-shadow:var(--shadow);margin-bottom:14px;position:relative;background:var(--surf);
+          z-index:1;isolation:isolate}
+#map{height:100%;width:100%}
+/* Map zit in eigen stacking context (isolation:isolate op .map-wrap),
+   dus interne Leaflet-panes blijven onder de modal (z-index 99999).
+   GEEN pane-z-index override — die brak de marker-klikbaarheid. */
+.leaflet-container{z-index:1}
+/* Club-naam tooltip */
+.club-label{background:#fff;border:1.5px solid #e8850a;color:#b3680a;font-weight:700;
+  font-size:11px;padding:3px 8px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.15);
+  white-space:nowrap}
+.club-label::before{border-top-color:#e8850a !important}
+.club-popup .leaflet-popup-content-wrapper{border-radius:14px;padding:4px;box-shadow:0 6px 22px rgba(0,0,0,.18)}
+.club-popup .leaflet-popup-content{margin:10px 12px;line-height:1.4}
+.me-label{background:#2c6dc7;border:0;color:#fff;font-weight:700;font-size:11px;
+  padding:3px 9px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:nowrap}
+.me-label::before{border-top-color:#2c6dc7 !important}
+.map-overlay{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:500}
+.map-toggle{background:var(--surf);padding:8px 12px;border-radius:10px;box-shadow:var(--shadow);
+            font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer}
+.map-toggle input{accent-color:var(--g)}
+.legend{position:absolute;bottom:10px;left:10px;background:var(--surf);padding:6px 10px;
+        border-radius:8px;font-size:11px;color:var(--muted);box-shadow:var(--shadow);
+        display:flex;align-items:center;gap:6px}
+.legend-gradient{width:60px;height:8px;border-radius:4px;
+       background:linear-gradient(90deg,#b5e435 0%,#e8850a 60%,#d84a2e 100%)}
+
+.radius-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+.radius-row input[type=range]{flex:1;accent-color:var(--g)}
+
+.section-h{font-family:var(--fd);font-size:22px;color:var(--g);
+           margin:18px 0 10px;letter-spacing:.5px;display:flex;align-items:center;
+           justify-content:space-between}
+.section-h .count{font-family:var(--ff);font-size:12px;background:var(--lime);
+                  color:var(--g2);padding:2px 8px;border-radius:var(--r-full);font-weight:700}
+
+/* ── Cards ── */
+.card{background:var(--surf);border-radius:var(--r-lg);padding:14px;
+      box-shadow:var(--shadow);margin-bottom:10px;display:flex;gap:12px;
+      align-items:center;transition:transform .12s}
+.card:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.card .av{width:48px;height:48px;border-radius:50%;background:var(--g);color:#fff;
+          display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;
+          background-size:cover;background-position:center}
+.card .info{flex:1;min-width:0}
+.card .info .name{font-weight:700;font-size:15px}
+.card .info .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.card .info .meta b{color:var(--text)}
+.k-badge{display:inline-block;background:var(--lime);color:var(--g2);padding:2px 8px;
+         border-radius:var(--r-full);font-size:11px;font-weight:700;margin-left:6px}
+.k-badge.elite{background:var(--g);color:var(--lime)}
+.dist-pill{font-size:11px;background:var(--bg);padding:3px 9px;border-radius:var(--r-full);
+           color:var(--muted);font-weight:600}
+.online{display:inline-block;width:8px;height:8px;background:#4ac776;
+        border-radius:50%;margin-right:4px;box-shadow:0 0 0 2px rgba(74,199,118,.25)}
+.empty{text-align:center;padding:30px 20px;color:var(--muted);font-size:14px}
+.empty svg{width:48px;height:48px;color:var(--border2);margin-bottom:8px}
+
+/* ── Posts view ── */
+.tabs{display:flex;gap:6px;background:var(--surf);padding:5px;border-radius:14px;
+      box-shadow:var(--shadow);margin-bottom:14px}
+.tabs button{flex:1;padding:9px;border-radius:10px;font-weight:600;color:var(--muted);
+             font-size:13px;transition:.12s;display:flex;align-items:center;justify-content:center;gap:4px}
+.tabs button.on{background:var(--g);color:#fff}
+.tabs button .count-pill{background:var(--lime);color:var(--g2);padding:1px 6px;border-radius:var(--r-full);
+                         font-size:11px;font-weight:700}
+.tabs button.on .count-pill{background:rgba(255,255,255,.25);color:#fff}
+
+.post-card{background:var(--surf);border-radius:var(--r-lg);padding:14px;
+           box-shadow:var(--shadow);margin-bottom:10px}
+.post-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.post-head .av{width:40px;height:40px;border-radius:50%;background:var(--g);color:#fff;
+               display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;
+               background-size:cover;background-position:center}
+.post-head .info{flex:1;min-width:0}
+.post-head .info .name{font-weight:700;font-size:14px}
+.post-head .info .meta{font-size:11px;color:var(--muted)}
+.post-body{font-size:13px;color:var(--text);margin:8px 0;line-height:1.5;background:var(--bg);
+           padding:10px 12px;border-radius:10px}
+.post-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:11px;color:var(--muted);margin-bottom:10px}
+.post-meta span{display:inline-flex;align-items:center;gap:4px;background:var(--bg);
+                padding:3px 8px;border-radius:var(--r-full)}
+.post-meta svg{width:11px;height:11px}
+.post-actions{display:flex;gap:8px}
+.expiry{font-size:11px;color:var(--amber);font-weight:600}
+.expiry.urgent{color:var(--red)}
+
+.vis-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;
+           padding:3px 8px;border-radius:var(--r-full);font-weight:600}
+.vis-everyone{background:#dde9f8;color:var(--blue)}
+.vis-klasse  {background:#fdf0d9;color:var(--amber)}
+.vis-nearby  {background:#e8f7d8;color:var(--g)}
+.vis-direct  {background:var(--bg);color:var(--muted)}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:96px;right:18px;width:56px;height:56px;border-radius:50%;
+     background:var(--lime);color:var(--g2);display:flex;align-items:center;justify-content:center;
+     box-shadow:var(--shadow-lg);font-size:28px;z-index:60;font-weight:700;cursor:pointer;
+     transition:transform .15s}
+.fab:active{transform:scale(.93)}
+.fab svg{width:24px;height:24px;stroke:currentColor;stroke-width:2.5;fill:none}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(14,31,18,.55);z-index:99999;
+          display:none;align-items:flex-end;justify-content:center;padding:0;
+          animation:fadeIn .2s ease;backdrop-filter:blur(2px)}
+.modal-bg.show{display:flex}
+.modal{background:var(--surf);border-radius:24px 24px 0 0;max-width:520px;width:100%;
+       max-height:92vh;overflow-y:auto;padding:20px;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (min-width:600px){
+  .modal-bg{align-items:center;padding:20px}
+  .modal{border-radius:18px}
+}
+.modal h3{font-family:var(--fd);font-size:24px;color:var(--g);margin-bottom:6px;letter-spacing:.5px}
+.modal .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.modal-close{float:right;width:32px;height:32px;border-radius:50%;background:var(--bg);
+             display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:20px}
+.modal-actions{display:flex;gap:10px;margin-top:14px}
+.modal-actions .btn{flex:1}
+
+/* visibility cards */
+.opt-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.opt-card{padding:12px;border-radius:12px;border:2px solid var(--border);cursor:pointer;
+          background:var(--surf);transition:.12s;text-align:center}
+.opt-card.on{border-color:var(--g);background:#e8f7d8}
+.opt-card .ic{font-size:24px;margin-bottom:4px}
+.opt-card .ti{font-weight:700;font-size:13px}
+.opt-card .de{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+
+/* ── Chat ── */
+.chat-item{display:flex;gap:12px;padding:12px 14px;background:var(--surf);
+           border-radius:var(--r);margin-bottom:6px;cursor:pointer;transition:.12s;
+           box-shadow:var(--shadow);align-items:center}
+.chat-item:hover{transform:translateX(2px)}
+.chat-item .av{width:44px;height:44px;border-radius:50%;background:var(--g);color:#fff;
+               display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;
+               background-size:cover;background-position:center}
+.chat-item .info{flex:1;min-width:0}
+.chat-item .name{font-weight:700;font-size:14px}
+.chat-item .prev{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;
+                 text-overflow:ellipsis;white-space:nowrap}
+.chat-item .unread{background:var(--g);color:#fff;border-radius:var(--r-full);
+                   padding:2px 8px;font-size:11px;font-weight:700;min-width:22px;text-align:center}
+
+.chat-view{display:flex;flex-direction:column;height:calc(100vh - 140px)}
+.chat-head{display:flex;align-items:center;gap:10px;padding:10px 0 14px;border-bottom:1px solid var(--border)}
+.chat-back{width:36px;height:36px;border-radius:10px;background:var(--bg);
+           display:flex;align-items:center;justify-content:center;font-size:20px}
+.chat-stream{flex:1;overflow-y:auto;padding:14px 0;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:78%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word}
+.msg.mine{align-self:flex-end;background:var(--g);color:#fff;border-bottom-right-radius:4px}
+.msg.theirs{align-self:flex-start;background:var(--surf);box-shadow:var(--shadow);border-bottom-left-radius:4px}
+.msg .time{font-size:10px;opacity:.7;margin-top:2px;display:block}
+.chat-input{display:flex;gap:8px;padding:10px 0;background:var(--bg);position:sticky;bottom:0}
+.chat-input input{flex:1;border-radius:var(--r-full)}
+.chat-input .btn{border-radius:50%;width:42px;padding:0;flex-shrink:0}
+
+/* ── History/Pending ── */
+.match-card{background:var(--surf);border-radius:var(--r-lg);padding:14px;
+            box-shadow:var(--shadow);margin-bottom:10px}
+.match-vs{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px}
+.match-vs .vs{color:var(--muted);font-weight:400}
+.match-meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+.score-line{font-family:var(--fd);font-size:24px;color:var(--g);letter-spacing:.5px}
+.win{color:var(--g)}.loss{color:var(--red)}
+
+/* ── Profile ── */
+.profile-head{text-align:center;background:var(--surf);border-radius:var(--r-lg);
+              padding:24px;margin-bottom:12px;box-shadow:var(--shadow)}
+.profile-head .av-big{width:88px;height:88px;border-radius:50%;background:var(--g);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-weight:700;
+                      font-size:34px;margin:0 auto 10px;background-size:cover;background-position:center;
+                      cursor:pointer;border:3px solid var(--lime)}
+.profile-head h2{font-family:var(--fd);font-size:30px;color:var(--g);letter-spacing:.5px}
+.profile-head .sub{color:var(--muted);font-size:13px;margin-top:4px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:var(--bg);border-radius:12px;padding:12px;text-align:center}
+.stat .v{font-family:var(--fd);font-size:24px;color:var(--g);letter-spacing:.5px}
+.stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+.setting-card{background:var(--surf);border-radius:var(--r-lg);padding:14px 18px;
+              box-shadow:var(--shadow);margin-bottom:8px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+.setting-row + .setting-row{border-top:1px solid var(--border)}
+.setting-row .l{flex:1}
+.setting-row .l .t{font-weight:600;font-size:14px}
+.setting-row .l .d{font-size:12px;color:var(--muted);margin-top:2px}
+
+.toggle{position:relative;width:42px;height:24px;background:var(--border);
+        border-radius:var(--r-full);cursor:pointer;transition:.2s;flex-shrink:0}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+               background:#fff;border-radius:50%;transition:.2s;box-shadow:var(--shadow)}
+.toggle.on{background:var(--g)}
+.toggle.on::after{left:20px}
+
+.slot-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.slot-day{text-align:center}
+.slot-day .dn{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px;text-transform:uppercase}
+.slot-cell{background:var(--bg);border-radius:6px;padding:8px 4px;font-size:11px;font-weight:600;cursor:pointer;
+           color:var(--muted);transition:.12s;border:1.5px solid transparent}
+.slot-cell.on{background:var(--g);color:#fff}
+.slot-cell:hover{border-color:var(--g)}
+
+/* ── Loading / toast ── */
+.toast{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:var(--g);
+       color:#fff;padding:10px 18px;border-radius:var(--r-full);font-size:13px;font-weight:600;
+       box-shadow:var(--shadow-lg);z-index:300;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.toast.error{background:var(--red)}
+.spinner{width:18px;height:18px;border:2px solid var(--lime);border-top-color:transparent;
+         border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.skeleton{height:64px;background:linear-gradient(90deg,var(--surf) 0%,var(--bg) 50%,var(--surf) 100%);
+          background-size:200% 100%;animation:sk 1.2s infinite;border-radius:var(--r-lg);margin-bottom:8px}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+
+@media (max-width:480px){
+  .map-wrap{height:280px}
+  .opt-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+
+<body>
+<!-- ════════════════ AUTH SCREEN ════════════════ -->
+<div id="auth-screen" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-hero">
+      <div class="logo">TennisConnect<span>🎾</span></div>
+      <p>Vind tennispartners in jouw buurt, klassement-op-maat.<br>Eén tap → een match.</p>
+    </div>
+    <div class="auth-tabs">
+      <button id="tab-login" class="on">Inloggen</button>
+      <button id="tab-register">Registreren</button>
+    </div>
+    <div id="auth-err" class="error"></div>
+
+    <form id="form-login">
+      <div class="field"><label>Email</label>
+        <input type="email" name="email" required autocomplete="email" placeholder="jij@example.com"></div>
+      <div class="field"><label>Wachtwoord</label>
+        <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••"></div>
+      <button type="submit" class="btn lg" style="width:100%">Inloggen</button>
+      <div class="legal">
+        Door verder te gaan ga je akkoord met onze
+        <a href="/privacy" target="_blank">Privacy Policy</a> en
+        <a href="/terms" target="_blank">Gebruiksvoorwaarden</a>.
+      </div>
+    </form>
+
+    <form id="form-register" style="display:none">
+      <div class="field"><label>Naam</label>
+        <input type="text" name="name" required placeholder="Voornaam Achternaam"></div>
+      <div class="field"><label>Email</label>
+        <input type="email" name="email" required autocomplete="email"></div>
+      <div class="field"><label>Wachtwoord <small style="color:var(--muted);font-weight:400">(min 8 tekens + 1 cijfer)</small></label>
+        <input type="password" name="password" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label>Klassement</label>
+        <select name="klasse" id="reg-klasse"></select></div>
+      <div class="field"><label>Stad <small style="color:var(--muted);font-weight:400">(optioneel)</small></label>
+        <input type="text" name="city" placeholder="bv. Boechout"></div>
+      <button type="submit" class="btn lg" style="width:100%">Account aanmaken</button>
+      <div class="legal">
+        Door te registreren ga je akkoord met onze
+        <a href="/privacy" target="_blank">Privacy Policy</a> en
+        <a href="/terms" target="_blank">Gebruiksvoorwaarden</a>.
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ════════════════ APP ════════════════ -->
+<div id="app" class="app" style="display:none">
+  <header class="topbar">
+    <div class="logo">TennisConnect<span>🎾</span></div>
+    <div class="topbar-right">
+      <div id="online-toggle" class="chip" title="Status">⚪ Offline</div>
+      <div id="my-avatar" class="avatar" title="Profiel">?</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ─── HOME ─── -->
+    <section id="view-home" class="view active">
+      <div class="controls">
+        <div class="chip on" data-grp="all">Alle</div>
+        <div class="chip" data-grp="3-15">3-15 punten</div>
+        <div class="chip" data-grp="15-35">15-35</div>
+        <div class="chip" data-grp="45-90">45-90</div>
+      </div>
+
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="map-overlay">
+          <label class="map-toggle"><input type="checkbox" id="toggle-heat" checked> Drukte-heatmap</label>
+          <label class="map-toggle"><input type="checkbox" id="toggle-clubs" checked> Tennisclubs</label>
+        </div>
+        <div class="legend" id="legend" style="display:none">
+          <span>Drukte</span><div class="legend-gradient"></div>
+        </div>
+      </div>
+
+      <div class="radius-row">
+        <span>Straal:</span>
+        <input type="range" id="radius" min="2" max="50" value="15" step="1">
+        <span id="radius-v" style="font-weight:700;color:var(--g);min-width:40px">15 km</span>
+      </div>
+
+      <div class="section-h">Spelers in de buurt <span class="count" id="players-count">0</span></div>
+      <div id="players-list">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <!-- ─── POSTS ─── -->
+    <section id="view-posts" class="view">
+      <div class="tabs">
+        <button id="tab-inbox" class="on">Inbox <span class="count-pill" id="cnt-inbox">0</span></button>
+        <button id="tab-open">Open posts <span class="count-pill" id="cnt-open">0</span></button>
+        <button id="tab-sent">Verzonden</button>
+      </div>
+
+      <div id="pane-inbox"><div class="empty">Geen aanvragen ontvangen.</div></div>
+      <div id="pane-open" style="display:none"><div class="empty">Geen open posts in jouw buurt.</div></div>
+      <div id="pane-sent" style="display:none"><div class="empty">Nog niets verzonden.</div></div>
+    </section>
+
+    <!-- ─── CHAT ─── -->
+    <section id="view-chat" class="view">
+      <div id="chat-list-pane">
+        <div class="section-h">Gesprekken</div>
+        <div id="chat-list"><div class="empty">Geen gesprekken — chat verschijnt zodra je een match aanvaardt.</div></div>
+      </div>
+      <div id="chat-view-pane" class="chat-view" style="display:none">
+        <div class="chat-head">
+          <div class="chat-back" id="chat-back">←</div>
+          <div class="av" id="chat-other-av"></div>
+          <div style="flex:1">
+            <div style="font-weight:700" id="chat-other-name">…</div>
+            <div style="font-size:11px;color:var(--muted)" id="chat-other-sub"></div>
+          </div>
+          <button class="btn ghost sm" id="chat-block">⋯</button>
+        </div>
+        <div class="chat-stream" id="chat-stream"></div>
+        <form class="chat-input" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Type een bericht…" maxlength="600" autocomplete="off">
+          <button type="submit" class="btn">➤</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ─── VRIENDEN ─── -->
+    <section id="view-friends" class="view">
+      <div class="tabs">
+        <button id="ftab-mine" class="on">Vrienden <span class="count-pill" id="cnt-friends">0</span></button>
+        <button id="ftab-incoming">Aanvragen <span class="count-pill" id="cnt-fincoming">0</span></button>
+        <button id="ftab-search">Zoeken</button>
+      </div>
+      <div id="fpane-mine"><div class="empty">Nog geen vrienden — tik op een speler en kies "+ Vriend".</div></div>
+      <div id="fpane-incoming" style="display:none"><div class="empty">Geen openstaande aanvragen.</div></div>
+      <div id="fpane-search" style="display:none">
+        <input type="text" id="friend-search-input" placeholder="🔍 Zoek speler op naam of stad..." style="margin-bottom:10px">
+        <div id="friend-search-results"><div class="empty">Begin te typen om spelers te vinden.</div></div>
+      </div>
+    </section>
+
+    <!-- ─── PROFILE ─── -->
+    <section id="view-profile" class="view">
+      <div class="profile-head">
+        <div class="av-big" id="prof-av" title="Klik om foto te wijzigen">?</div>
+        <h2 id="prof-name">…</h2>
+        <div class="sub" id="prof-sub"></div>
+        <div class="stats-row">
+          <div class="stat"><div class="v" id="stat-m">0</div><div class="l">Matches</div></div>
+          <div class="stat"><div class="v" id="stat-w">0</div><div class="l">Winst</div></div>
+          <div class="stat"><div class="v" id="stat-r">0%</div><div class="l">Winrate</div></div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-row">
+          <div class="l"><div class="t">Klassement</div><div class="d">Tennis &amp; Padel Vlaanderen punten</div></div>
+          <select id="prof-klasse" style="width:auto;min-width:90px"></select>
+        </div>
+        <div class="setting-row">
+          <div class="l"><div class="t">Stad</div><div class="d">Voor het zoeken van clubs in de buurt</div></div>
+          <input type="text" id="prof-city" style="width:auto;min-width:140px" placeholder="bv. Mortsel">
+        </div>
+        <div class="setting-row">
+          <div class="l"><div class="t">Bio</div><div class="d">Korte intro (max 280 tekens)</div></div>
+        </div>
+        <textarea id="prof-bio" maxlength="280" placeholder="Speelstijl, voorkeur, …"></textarea>
+        <div class="setting-row">
+          <div class="l" style="text-align:right"><button class="btn sm" id="save-profile">Profiel opslaan</button></div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-row">
+          <div class="l"><div class="t">Wanneer kan je spelen?</div>
+            <div class="d">Tik op uren om jouw beschikbaarheid te zetten</div></div>
+          <button class="btn ghost sm" id="save-slots">Opslaan</button>
+        </div>
+        <div id="slot-grid" class="slot-grid"></div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-row">
+          <div class="l"><div class="t">Beschikbaar voor matches</div>
+            <div class="d">Andere spelers zien dat je nu vrij bent</div></div>
+          <div class="toggle" id="set-avail"></div>
+        </div>
+        <div class="setting-row">
+          <div class="l"><div class="t">Locatie delen</div>
+            <div class="d">Voor de kaart &amp; "spelers in de buurt"</div></div>
+          <button class="btn ghost sm" id="set-loc">GPS aan</button>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-row">
+          <div class="l"><div class="t">Privacy &amp; Voorwaarden</div>
+            <div class="d">Wat we wel/niet bewaren</div></div>
+          <a href="/privacy" target="_blank" class="btn ghost sm">Lezen →</a>
+        </div>
+        <div class="setting-row">
+          <div class="l"><div class="t">Uitloggen</div>
+            <div class="d">Je sessie wissen</div></div>
+          <button class="btn ghost sm" id="logout">Uitloggen</button>
+        </div>
+        <div class="setting-row">
+          <div class="l"><div class="t" style="color:var(--red)">Account verwijderen</div>
+            <div class="d">Wist al je data direct (GDPR)</div></div>
+          <button class="btn red sm" id="delete-account">Verwijder</button>
+        </div>
+      </div>
+
+      <div class="section-h">Te scoren <span class="count" id="cnt-pending">0</span></div>
+      <div id="pending-list"><div class="empty">Geen openstaande matches.</div></div>
+
+      <div class="section-h">Mijn matches</div>
+      <div id="history-list"><div class="empty">Geen matches gespeeld.</div></div>
+
+      <div class="section-h">Klassement Top 10</div>
+      <div id="ranking-list"></div>
+    </section>
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="home">
+      <svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+      <span>Home</span></button>
+    <button class="nav-btn badge" data-view="posts">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v12H7l-3 3z"/></svg>
+      <span>Posts</span><i class="dot"></i></button>
+    <button class="nav-btn" data-view="chat">
+      <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.5 8.5 8.5 0 0 1-4-1L3 21l2-5a8.5 8.5 0 1 1 16-4.5z"/></svg>
+      <span>Chat</span></button>
+    <button class="nav-btn badge" data-view="friends">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M22 18a4 4 0 0 0-5-3.8"/></svg>
+      <span>Vrienden</span><i class="dot" id="dot-friends"></i></button>
+    <button class="nav-btn" data-view="profile">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+      <span>Profiel</span></button>
+  </nav>
+
+  <!-- FAB: nieuwe post -->
+  <div class="fab" id="fab-new" title="Nieuwe match-post">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </div>
+</div>
+
+<!-- ════════════════ MODALS ════════════════ -->
+<div class="modal-bg" id="modal-new">
+  <div class="modal">
+    <button class="modal-close" onclick="hideModal('modal-new')">×</button>
+    <h3>Nieuwe match-post</h3>
+    <p class="sub">Plaats een open uitnodiging of stuur direct naar 1 speler.</p>
+
+    <label>Type</label>
+    <div class="opt-row" id="opt-type">
+      <div class="opt-card on" data-type="open"><div class="ic">📣</div><div class="ti">Open post</div><div class="de">Iedereen kan accepteren</div></div>
+      <div class="opt-card" data-type="direct"><div class="ic">🎯</div><div class="ti">Directe uitnodiging</div><div class="de">Naar 1 specifieke speler</div></div>
+    </div>
+
+    <div id="direct-block" style="display:none">
+      <label>Speler</label>
+      <select id="post-to"></select>
+    </div>
+
+    <div id="vis-block">
+      <label style="margin-top:14px">Wie mag het zien?</label>
+      <div class="opt-row">
+        <div class="opt-card on" data-vis="everyone"><div class="ic">🌍</div><div class="ti">Iedereen</div><div class="de">Alle spelers</div></div>
+        <div class="opt-card" data-vis="klasse"><div class="ic">🎾</div><div class="ti">Mijn klasse</div><div class="de">Zelfde niveau</div></div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-card" data-vis="nearby" style="grid-column:span 2"><div class="ic">📍</div><div class="ti">Spelers binnen 15 km</div><div class="de">Lokaal</div></div>
+      </div>
+    </div>
+
+    <label style="margin-top:14px">Vervalt na</label>
+    <div class="opt-row" id="opt-ttl">
+      <div class="opt-card" data-ttl="3"><div class="ti">3 uur</div></div>
+      <div class="opt-card on" data-ttl="24"><div class="ti">24 uur</div></div>
+      <div class="opt-card" data-ttl="72"><div class="ti">3 dagen</div></div>
+      <div class="opt-card" data-ttl="12"><div class="ti">12 uur</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <div><label>Datum</label><input type="date" id="post-date"></div>
+      <div><label>Tijd</label><input type="time" id="post-time" value="18:00"></div>
+    </div>
+    <div style="margin-top:10px">
+      <label>Club <small style="color:var(--muted);font-weight:400">(dichtstbijzijnde clubs)</small></label>
+      <select id="post-club"><option value="">— Kies een club —</option></select>
+    </div>
+    <div style="margin-top:10px">
+      <label>Bericht <small style="color:var(--muted);font-weight:400">(optioneel)</small></label>
+      <textarea id="post-msg" maxlength="300" placeholder="bv. Iemand zin in dubbel zaterdag?"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="hideModal('modal-new')">Annuleren</button>
+      <button class="btn lime" id="post-submit">📣 Plaatsen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-score">
+  <div class="modal">
+    <button class="modal-close" onclick="hideModal('modal-score')">×</button>
+    <h3>Score invoeren</h3>
+    <p class="sub" id="score-sub"></p>
+    <label>Wie won?</label>
+    <div class="opt-row" id="score-winner"></div>
+    <label style="margin-top:14px">Score (sets)</label>
+    <input type="text" id="score-text" placeholder="bv. 6-3, 6-4">
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="hideModal('modal-score')">Annuleren</button>
+      <button class="btn" id="score-submit">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-profile">
+  <div class="modal" id="modal-profile-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═════════════════════════════════════════════════════════════════════════════
+   STATE
+   ═════════════════════════════════════════════════════════════════════════════ */
+const API = '';
+let TOKEN = localStorage.getItem('tc_token') || '';
+let ME    = null;
+let META  = null;
+let MAP, MAP_MARKERS = [], HEAT_LAYER = null, HEAT_ON = true;
+let CURRENT_VIEW = 'home', CURRENT_CHAT = null;
+let CACHE = { players: [], posts: [], incoming: [], outgoing: [], pending: [], history: [], rankings: [] };
+
+/* ─── util ─── */
+function $(s){return document.querySelector(s)}
+function $$(s){return [...document.querySelectorAll(s)]}
+function el(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!==undefined)e.innerHTML=html;return e}
+function escapeHtml(s){return (s||'').replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function initials(n){return (n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}
+function fmtTime(iso){if(!iso)return '';const d=new Date(iso.replace(' ','T')+'Z');const now=new Date();const m=Math.floor((now-d)/60000);if(m<1)return 'nu';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'u';return Math.floor(h/24)+'d'}
+function fmtDate(s){if(!s)return '';const [y,m,d]=s.split('-');return `${d}/${m}`}
+function timeLeft(iso){if(!iso)return null;const d=new Date(iso.replace(' ','T')+'Z');const m=Math.floor((d-new Date())/60000);if(m<=0)return {text:'verlopen',urgent:true};if(m<60)return {text:'<1u',urgent:true};const h=Math.floor(m/60);if(h<24)return {text:h+'u',urgent:h<3};return {text:Math.floor(h/24)+'d',urgent:false}}
+
+function toast(msg, error=false){
+  const t=$('#toast'); t.textContent=msg; t.classList.toggle('error',error); t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+async function api(path, opts={}){
+  const headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers.Authorization = 'Bearer ' + TOKEN;
+  const res = await fetch(API + path, {...opts, headers: {...headers, ...(opts.headers||{})}, body: opts.body ? JSON.stringify(opts.body) : undefined});
+  if (res.status === 401){ logout(); throw new Error('Niet ingelogd'); }
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || 'Fout');
+  return data;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   AUTH
+   ═════════════════════════════════════════════════════════════════════════════ */
+function showAuth(){ $('#auth-screen').style.display='flex'; $('#app').style.display='none'; }
+function showApp(){ $('#auth-screen').style.display='none'; $('#app').style.display='flex'; }
+
+$('#tab-login').addEventListener('click', ()=>{
+  $('#tab-login').classList.add('on'); $('#tab-register').classList.remove('on');
+  $('#form-login').style.display=''; $('#form-register').style.display='none';
+});
+$('#tab-register').addEventListener('click', ()=>{
+  $('#tab-register').classList.add('on'); $('#tab-login').classList.remove('on');
+  $('#form-register').style.display=''; $('#form-login').style.display='none';
+});
+
+function showErr(msg){const e=$('#auth-err');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),5000)}
+
+$('#form-login').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try{
+    const data = await api('/api/login',{method:'POST',body:{email:fd.get('email'),password:fd.get('password')}});
+    TOKEN = data.token; ME = data.user;
+    localStorage.setItem('tc_token', TOKEN);
+    boot();
+  }catch(err){ showErr(err.message); }
+});
+
+$('#form-register').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try{
+    const data = await api('/api/register',{method:'POST',body:{
+      name:fd.get('name'), email:fd.get('email'), password:fd.get('password'),
+      klasse:fd.get('klasse'), city:fd.get('city')
+    }});
+    TOKEN = data.token; ME = data.user;
+    localStorage.setItem('tc_token', TOKEN);
+    boot();
+  }catch(err){ showErr(err.message); }
+});
+
+function logout(){
+  TOKEN=''; ME=null; localStorage.removeItem('tc_token');
+  if (MAP){ try{ MAP.remove(); }catch(e){} MAP=null; }
+  MAP_MARKERS=[]; CLUB_MARKERS=[]; HEAT_LAYER=null;
+  showAuth();
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═════════════════════════════════════════════════════════════════════════════ */
+async function boot(){
+  showApp();
+  try{
+    META = await fetch('/api/meta').then(r=>r.json());
+    fillKlasseSelects();
+    ME = await api('/api/me');
+    renderMe();
+    initMap();
+    await Promise.all([loadPlayers(), loadDensity(), loadClubs(), loadPosts(), loadCounts()]);
+  }catch(err){
+    console.error(err); showErr(err.message); logout();
+  }
+}
+
+function fillKlasseSelects(){
+  const opts = META.klasses.map(k=>`<option value="${k}">${k}</option>`).join('');
+  $('#reg-klasse').innerHTML = opts;
+  $('#prof-klasse').innerHTML = opts;
+}
+
+function renderMe(){
+  const initi = initials(ME.name);
+  const av = $('#my-avatar');
+  if (ME.photo){ av.style.backgroundImage=`url('${ME.photo}')`; av.textContent=''; }
+  else { av.style.backgroundImage=''; av.textContent=initi; }
+  // online toggle
+  const t = $('#online-toggle');
+  t.innerHTML = ME.available ? '🟢 Online' : '⚪ Offline';
+  // profile fill
+  $('#prof-av').textContent = ME.photo ? '' : initi;
+  $('#prof-av').style.backgroundImage = ME.photo ? `url('${ME.photo}')` : '';
+  $('#prof-name').textContent = ME.name;
+  $('#prof-sub').textContent = `${ME.klasse} · ${ME.city || '—'}`;
+  $('#prof-klasse').value = ME.klasse;
+  $('#prof-city').value = ME.city || '';
+  $('#prof-bio').value = ME.bio || '';
+  $('#set-avail').classList.toggle('on', !!ME.available);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   MAP + HEATMAP
+   ═════════════════════════════════════════════════════════════════════════════ */
+function initMap(){
+  const center = (ME.lat && ME.lng) ? [ME.lat, ME.lng] : [51.20, 4.42];
+  // Idempotent: als de kaart al bestaat, gewoon hercentreren
+  if (MAP){ try{ MAP.setView(center, 11); MAP.invalidateSize(); return; }catch(e){ try{MAP.remove();}catch(_){} MAP=null; } }
+  // Defensief: als het DOM-element nog een oude Leaflet-id heeft, wis hem
+  const mapEl = document.getElementById('map');
+  if (mapEl && mapEl._leaflet_id){ mapEl._leaflet_id = null; mapEl.innerHTML = ''; }
+  MAP = L.map('map',{zoomControl:true}).setView(center, 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap', maxZoom:18
+  }).addTo(MAP);
+  MAP.on('zoomend', updateClubLabels);
+  if (ME.lat && ME.lng){
+    const meIcon = L.divIcon({
+      className:'me-marker',
+      html:'<div style="width:13px;height:13px;border-radius:50%;background:#2c6dc7;'
+          +'border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(44,109,199,.4),0 1px 4px rgba(0,0,0,.4)"></div>',
+      iconSize:[13,13], iconAnchor:[6.5,6.5]
+    });
+    L.marker([ME.lat,ME.lng],{icon:meIcon, zIndexOffset:1000})
+      .bindTooltip('Jij', {direction:'top', offset:[0,-8], className:'me-label'})
+      .bindPopup('<b style="color:#2c6dc7">Dit ben jij</b>')
+      .addTo(MAP);
+  }
+}
+
+function drawPlayersOnMap(players){
+  MAP_MARKERS.forEach(m=>MAP.removeLayer(m));
+  MAP_MARKERS = [];
+  players.forEach(p=>{
+    if (!p.lat || !p.lng) return;
+    // Privacy: spelers verschijnen enkel als anonieme groene stip.
+    // Niet klikbaar — geen naam, geen afstand, geen profiel via de kaart.
+    const m = L.circleMarker([p.lat,p.lng],{
+      radius:7, color: p.available ? '#1a6b3a' : '#6b7c6a',
+      fillColor: p.available ? '#b5e435':'#dde8d8', fillOpacity:.85, weight:2,
+      interactive:false
+    }).addTo(MAP);
+    MAP_MARKERS.push(m);
+  });
+}
+
+function drawHeatmap(points, max){
+  if (HEAT_LAYER) { MAP.removeLayer(HEAT_LAYER); HEAT_LAYER = null; }
+  if (!HEAT_ON || !points.length) { $('#legend').style.display='none'; return; }
+  const data = points.map(p=>[p.lat, p.lng, p.weight/(max||1)]);
+  HEAT_LAYER = L.heatLayer(data, {radius:30, blur:25, maxZoom:14,
+    gradient:{0.2:'#b5e435', 0.5:'#e8850a', 0.9:'#d84a2e'}}).addTo(MAP);
+  $('#legend').style.display='flex';
+}
+
+$('#toggle-heat').addEventListener('change', e=>{
+  HEAT_ON = e.target.checked;
+  loadDensity();
+});
+
+/* ─── CLUBS layer ─── */
+let CLUB_MARKERS = [], CLUBS_ON = true, CLUBS_CACHE = [];
+
+async function fetchClubs(){
+  try{
+    CLUBS_CACHE = await api(`/api/clubs?radius=${Math.max(CURRENT_RADIUS*3, 60)}`);
+  }catch(e){ console.error('fetchClubs',e); }
+  return CLUBS_CACHE;
+}
+$('#toggle-clubs').addEventListener('change', e=>{
+  CLUBS_ON = e.target.checked;
+  if (!CLUBS_ON){ CLUB_MARKERS.forEach(m=>MAP.removeLayer(m)); CLUB_MARKERS=[]; }
+  else loadClubs();
+});
+function updateClubLabels(){
+  if (!MAP) return;
+  const z = MAP.getZoom();
+  CLUB_MARKERS.forEach(m=>{
+    const tip = m.getTooltip(); if (!tip) return;
+    if (z >= 13) m.openTooltip(); else m.closeTooltip();
+  });
+}
+async function loadClubs(){
+  if (!CLUBS_ON || !MAP) return;
+  try{
+    const list = await fetchClubs();
+    CLUB_MARKERS.forEach(m=>MAP.removeLayer(m));
+    CLUB_MARKERS = [];
+    list.forEach(c=>{
+      if (!c.lat || !c.lng) return;
+      const icon = L.divIcon({
+        className:'club-marker',
+        html:'<div style="background:#e8850a;color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff">🎾</div>',
+        iconSize:[26,26], iconAnchor:[13,13]
+      });
+      const safeName = (c.name||'').replace(/[<>"'&]/g, ch=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[ch]));
+      const hours = c.opening_hours || 'Ma-Vr 09:00-22:00 · Za-Zo 09:00-20:00';
+      const popupHtml = `
+        <div style="font-family:'DM Sans',sans-serif;min-width:200px">
+          <div style="font-family:'Bebas Neue',Impact,sans-serif;font-size:18px;color:#1a6b3a;letter-spacing:.5px;margin-bottom:6px;line-height:1.1">${safeName}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;color:#3a4a3a">
+            <span style="color:#e8850a">📍</span>
+            <b style="color:#0e1f12">${c.dist_me} km</b> van jou
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;color:#3a4a3a">
+            <span style="color:#e8850a">🕐</span> ${escapeHtml(hours)}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;color:#3a4a3a">
+            <span style="color:#e8850a">🎾</span> ${c.courts||'?'} terreinen
+          </div>
+          ${c.address ? `<div style="font-size:11px;color:#6b7c6a;margin-bottom:8px">${escapeHtml(c.address)}</div>` : ''}
+          <button data-club="${safeName}" onclick="usePostClub(this.dataset.club)" style="width:100%;background:#1a6b3a;color:#fff;border:0;padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit">🎾 Plan match hier</button>
+        </div>`;
+      const m = L.marker([c.lat,c.lng],{icon, title:c.name||''})
+        .bindTooltip(`${safeName} · ${c.dist_me} km`, {direction:'top', offset:[0,-12], className:'club-label', opacity:0.95})
+        .bindPopup(popupHtml, {maxWidth:260, className:'club-popup'})
+        .addTo(MAP);
+      m.on('click', function(){ this.openPopup(); });
+      CLUB_MARKERS.push(m);
+    });
+    updateClubLabels();
+  }catch(e){ console.error('clubs',e); }
+}
+async function usePostClub(name){
+  openNewPostModal();
+  await fillClubSelect(name);
+  // Als de club niet in de lijst stond, voeg hem toe en selecteer
+  const sel = $('#post-club');
+  if (sel.value !== name){
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o); sel.value = name;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PLAYERS
+   ═════════════════════════════════════════════════════════════════════════════ */
+let CURRENT_GROUP = 'all';
+let CURRENT_RADIUS = 15;
+
+$$('.controls .chip').forEach(c=>c.addEventListener('click', ()=>{
+  $$('.controls .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on');
+  CURRENT_GROUP = c.dataset.grp;
+  loadPlayers();
+}));
+
+$('#radius').addEventListener('input', e=>{
+  CURRENT_RADIUS = +e.target.value;
+  $('#radius-v').textContent = CURRENT_RADIUS + ' km';
+});
+$('#radius').addEventListener('change', ()=>{ loadPlayers(); loadDensity(); loadClubs(); });
+
+async function loadPlayers(){
+  let klasse = 'all';
+  if (CURRENT_GROUP !== 'all' && META){
+    klasse = (META.klasse_groups[CURRENT_GROUP] || []).join(',');
+  }
+  try{
+    const list = await api(`/api/players?radius=${CURRENT_RADIUS}&klasse=${encodeURIComponent(klasse)}`);
+    CACHE.players = list;
+    $('#players-count').textContent = list.length;
+    renderPlayers(list);
+    drawPlayersOnMap(list);
+  }catch(e){ console.error(e); }
+}
+
+async function loadDensity(){
+  try{
+    const data = await api(`/api/density?radius=${CURRENT_RADIUS}`);
+    drawHeatmap(data.points, data.max);
+  }catch(e){ console.error(e); }
+}
+
+function renderPlayers(list){
+  const c = $('#players-list');
+  if (!list.length){ c.innerHTML = `<div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1 2 4 2 4-2 4-2"/></svg>
+    <div>Geen spelers binnen ${CURRENT_RADIUS}km.<br>Probeer een grotere straal.</div></div>`; return; }
+  c.innerHTML = list.map(p=>{
+    const avBg = p.photo ? `style="background-image:url('${p.photo}')"` : '';
+    const avTx = p.photo ? '' : initials(p.name);
+    const online = p.available ? '<span class="online"></span>' : '';
+    return `<div class="card" onclick="openPublicProfile(${p.id})">
+      <div class="av" ${avBg}>${avTx}</div>
+      <div class="info">
+        <div class="name">${online}${escapeHtml(p.name)} <span class="k-badge ${p.klasse==='Elite'?'elite':''}">${p.klasse}</span></div>
+        <div class="meta">${escapeHtml(p.city||'')} · <b>${p.dist} km</b></div>
+      </div>
+      <button class="btn sm" onclick="event.stopPropagation();quickInvite(${p.id})">Uitdagen</button>
+    </div>`;
+  }).join('');
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PUBLIC PROFILE MODAL
+   ═════════════════════════════════════════════════════════════════════════════ */
+async function openPublicProfile(uid){
+  try{
+    const u = await api(`/api/users/${uid}/profile`);
+    const avBg = u.photo ? `style="background-image:url('${u.photo}');background-size:cover;background-position:center"` : '';
+    $('#modal-profile-content').innerHTML = `
+      <button class="modal-close" onclick="hideModal('modal-profile')">×</button>
+      <div style="text-align:center;padding:8px 0">
+        <div class="av-big" ${avBg}>${u.photo?'':initials(u.name)}</div>
+        <h2 style="font-family:var(--fd);font-size:28px;color:var(--g);margin-top:8px">${escapeHtml(u.name)}</h2>
+        <div style="color:var(--muted);font-size:13px">${u.klasse} · ${escapeHtml(u.city||'')}</div>
+      </div>
+      <div class="stats-row" style="margin:14px 0">
+        <div class="stat"><div class="v">${u.matches}</div><div class="l">Matches</div></div>
+        <div class="stat"><div class="v">${u.wins}</div><div class="l">Winst</div></div>
+        <div class="stat"><div class="v">${u.win_rate}%</div><div class="l">Winrate</div></div>
+      </div>
+      ${u.bio ? `<div style="background:var(--bg);padding:12px;border-radius:10px;font-size:13px;margin-bottom:14px">${escapeHtml(u.bio)}</div>` : ''}
+      <div class="modal-actions">
+        <button class="btn ghost" onclick="reportUser(${u.id})">⚠️ Melden</button>
+        <button class="btn ghost" id="pp-friend-btn" onclick="toggleFriend(${u.id})">+ Vriend</button>
+        <button class="btn lime" onclick="hideModal('modal-profile');quickInvite(${u.id})">🎾 Uitdagen</button>
+      </div>
+      <div style="margin-top:8px;text-align:center">
+        <button class="btn ghost red sm" onclick="blockUser(${u.id})">🚫 Blokkeren</button>
+      </div>`;
+    // Update friend button label based on current status
+    refreshFriendButton(u.id);
+    showModal('modal-profile');
+  }catch(e){ toast(e.message, true); }
+}
+
+async function blockUser(uid){
+  if (!confirm('Speler blokkeren? Je ziet elkaar niet meer in de app.')) return;
+  try{ await api(`/api/users/${uid}/block`,{method:'POST'}); toast('Geblokkeerd'); hideModal('modal-profile'); loadPlayers(); }
+  catch(e){ toast(e.message,true); }
+}
+async function reportUser(uid){
+  const reason = prompt('Waarom rapporteer je deze speler?'); if (!reason) return;
+  try{ await api(`/api/users/${uid}/report`,{method:'POST',body:{reason}}); toast('Rapport verzonden'); }
+  catch(e){ toast(e.message,true); }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   FRIENDS
+   ═════════════════════════════════════════════════════════════════════════════ */
+let FRIEND_TAB = 'mine';
+const FBTN_LABELS = {
+  none:        {t:'+ Vriend',        cls:'btn ghost'},
+  pending_out: {t:'⏳ Aanvraag verzonden', cls:'btn ghost'},
+  pending_in:  {t:'✅ Accepteren',    cls:'btn lime'},
+  accepted:    {t:'✓ Vrienden',      cls:'btn ghost'},
+};
+async function refreshFriendButton(uid){
+  const btn = $('#pp-friend-btn'); if (!btn) return;
+  try{
+    const {status} = await api(`/api/friends/check/${uid}`);
+    const lbl = FBTN_LABELS[status] || FBTN_LABELS.none;
+    btn.textContent = lbl.t; btn.className = lbl.cls + ' sm';
+    btn.dataset.status = status;
+  }catch(e){}
+}
+async function toggleFriend(uid){
+  const btn = $('#pp-friend-btn'); const status = btn ? btn.dataset.status : 'none';
+  try{
+    if (status === 'accepted'){
+      if (!confirm('Vriend verwijderen?')) return;
+      await api(`/api/friends/${uid}`,{method:'DELETE'}); toast('Vriend verwijderd');
+    } else if (status === 'pending_out'){
+      await api(`/api/friends/${uid}`,{method:'DELETE'}); toast('Aanvraag ingetrokken');
+    } else if (status === 'pending_in'){
+      await api(`/api/friends/${uid}/accept`,{method:'POST'}); toast('🎾 Nieuwe vriend!');
+    } else {
+      await api(`/api/friends/${uid}/request`,{method:'POST'}); toast('Aanvraag verzonden');
+    }
+    refreshFriendButton(uid);
+    loadFriendCounts();
+  }catch(e){ toast(e.message,true); }
+}
+
+document.addEventListener('click', e=>{
+  if (e.target.matches('#ftab-mine')) switchFriendTab('mine');
+  if (e.target.matches('#ftab-incoming')) switchFriendTab('incoming');
+  if (e.target.matches('#ftab-search')) switchFriendTab('search');
+});
+function switchFriendTab(t){
+  FRIEND_TAB = t;
+  ['mine','incoming','search'].forEach(x=>{
+    const b = $('#ftab-'+x); if (b) b.classList.toggle('on', x===t);
+    const p = $('#fpane-'+x); if (p) p.style.display = x===t ? '' : 'none';
+  });
+  if (t==='search') setTimeout(()=>$('#friend-search-input').focus(), 100);
+}
+
+async function loadFriends(){
+  try{
+    const [mine, incoming] = await Promise.all([
+      api('/api/friends'),
+      api('/api/friends/incoming'),
+    ]);
+    $('#cnt-friends').textContent = mine.length;
+    $('#cnt-fincoming').textContent = incoming.length;
+    $('#dot-friends').style.display = incoming.length>0 ? 'block' : 'none';
+    renderFriendsMine(mine);
+    renderFriendsIncoming(incoming);
+  }catch(e){ console.error(e); }
+}
+async function loadFriendCounts(){
+  try{
+    const incoming = await api('/api/friends/incoming');
+    $('#dot-friends').style.display = incoming.length>0 ? 'block' : 'none';
+    if (CURRENT_VIEW==='friends') loadFriends();
+  }catch(e){}
+}
+
+function friendCard(u, actions){
+  const avBg = u.photo ? `style="background-image:url('${u.photo}')"`:'';
+  const online = u.available ? '<span class="online"></span>' : '';
+  return `<div class="card">
+    <div class="av" ${avBg} onclick="openPublicProfile(${u.id})">${u.photo?'':initials(u.name)}</div>
+    <div class="info" onclick="openPublicProfile(${u.id})" style="cursor:pointer">
+      <div class="name">${online}${escapeHtml(u.name)} <span class="k-badge">${u.klasse}</span></div>
+      <div class="meta">${escapeHtml(u.city||'')}</div>
+    </div>
+    <div style="display:flex;gap:6px">${actions}</div>
+  </div>`;
+}
+function renderFriendsMine(list){
+  const c = $('#fpane-mine');
+  if (!list.length){ c.innerHTML = '<div class="empty">Nog geen vrienden — tik op een speler en kies "+ Vriend".</div>'; return; }
+  c.innerHTML = list.map(u=>friendCard(u,
+    `<button class="btn sm" onclick="openChatById(${u.id})">💬</button>
+     <button class="btn lime sm" onclick="quickInvite(${u.id})">🎾</button>`)).join('');
+}
+function renderFriendsIncoming(list){
+  const c = $('#fpane-incoming');
+  if (!list.length){ c.innerHTML = '<div class="empty">Geen openstaande aanvragen.</div>'; return; }
+  c.innerHTML = list.map(u=>friendCard(u,
+    `<button class="btn ghost sm" onclick="declineFriend(${u.id})">×</button>
+     <button class="btn lime sm" onclick="acceptFriend(${u.id})">✅</button>`)).join('');
+}
+async function acceptFriend(uid){
+  try{ await api(`/api/friends/${uid}/accept`,{method:'POST'}); toast('🎾 Nieuwe vriend!'); loadFriends(); }
+  catch(e){ toast(e.message,true); }
+}
+async function declineFriend(uid){
+  try{ await api(`/api/friends/${uid}`,{method:'DELETE'}); loadFriends(); }
+  catch(e){ toast(e.message,true); }
+}
+function openChatById(uid){ switchView('chat'); setTimeout(()=>openChat(uid),100); }
+
+/* Friend search */
+let searchTimer=null;
+document.addEventListener('input', e=>{
+  if (e.target.id === 'friend-search-input'){
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    searchTimer = setTimeout(()=>doFriendSearch(q), 250);
+  }
+});
+async function doFriendSearch(q){
+  const c = $('#friend-search-results');
+  if (q.length<2){ c.innerHTML='<div class="empty">Begin te typen om spelers te vinden.</div>'; return; }
+  try{
+    // Hergebruik /api/players (sneller dan een aparte search-endpoint)
+    const all = await api('/api/players?radius=200&klasse=all');
+    const ql = q.toLowerCase();
+    const matches = all.filter(p =>
+      (p.name||'').toLowerCase().includes(ql) || (p.city||'').toLowerCase().includes(ql)
+    ).slice(0,20);
+    if (!matches.length){ c.innerHTML='<div class="empty">Geen spelers gevonden.</div>'; return; }
+    c.innerHTML = matches.map(u=>friendCard(u,
+      `<button class="btn ghost sm" onclick="sendFriendRequest(${u.id}, this)">+ Vriend</button>`)).join('');
+  }catch(e){ toast(e.message,true); }
+}
+async function sendFriendRequest(uid, btn){
+  try{
+    await api(`/api/friends/${uid}/request`,{method:'POST'});
+    btn.textContent = '⏳ Verzonden'; btn.disabled = true;
+    toast('Vriendsaanvraag verzonden');
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   NEW POST MODAL
+   ═════════════════════════════════════════════════════════════════════════════ */
+let POST_TYPE = 'open', POST_VIS = 'everyone', POST_TTL = 24, POST_TO = null;
+
+$('#fab-new').addEventListener('click', ()=>openNewPostModal());
+
+function openNewPostModal(directTo=null){
+  POST_TYPE = directTo ? 'direct' : 'open';
+  POST_TO = directTo; POST_VIS = 'everyone'; POST_TTL = 24;
+  // Reset UI
+  $$('#opt-type .opt-card').forEach(c=>c.classList.toggle('on', c.dataset.type===POST_TYPE));
+  $$('#vis-block .opt-card').forEach(c=>c.classList.toggle('on', c.dataset.vis==='everyone'));
+  $$('#opt-ttl .opt-card').forEach(c=>c.classList.toggle('on', +c.dataset.ttl===24));
+  $('#direct-block').style.display = directTo ? '' : 'none';
+  $('#vis-block').style.display = directTo ? 'none' : '';
+  // Pre-fill date
+  $('#post-date').value = new Date(Date.now()+86400000).toISOString().slice(0,10);
+  $('#post-msg').value = '';
+  // Build player select for direct mode
+  const sel = $('#post-to');
+  sel.innerHTML = CACHE.players.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} (${p.klasse} · ${p.dist}km)</option>`).join('');
+  if (directTo) sel.value = directTo;
+  // Vul de club-dropdown met dichtstbijzijnde clubs
+  fillClubSelect();
+  showModal('modal-new');
+}
+
+async function fillClubSelect(preselect){
+  const sel = $('#post-club');
+  if (!CLUBS_CACHE.length) await fetchClubs();
+  const sorted = [...CLUBS_CACHE].sort((a,b)=>(a.dist_me||999)-(b.dist_me||999));
+  let opts = '<option value="">— Kies een club —</option>';
+  opts += sorted.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} · ${c.dist_me} km</option>`).join('');
+  sel.innerHTML = opts;
+  if (preselect) sel.value = preselect;
+}
+
+$$('#opt-type .opt-card').forEach(c=>c.addEventListener('click', ()=>{
+  POST_TYPE = c.dataset.type;
+  $$('#opt-type .opt-card').forEach(x=>x.classList.toggle('on', x===c));
+  $('#direct-block').style.display = POST_TYPE==='direct' ? '' : 'none';
+  $('#vis-block').style.display = POST_TYPE==='direct' ? 'none' : '';
+}));
+$$('#vis-block .opt-card').forEach(c=>c.addEventListener('click', ()=>{
+  POST_VIS = c.dataset.vis;
+  $$('#vis-block .opt-card').forEach(x=>x.classList.toggle('on', x===c));
+}));
+$$('#opt-ttl .opt-card').forEach(c=>c.addEventListener('click', ()=>{
+  POST_TTL = +c.dataset.ttl;
+  $$('#opt-ttl .opt-card').forEach(x=>x.classList.toggle('on', x===c));
+}));
+
+$('#post-submit').addEventListener('click', async ()=>{
+  const body = {
+    datum: $('#post-date').value,
+    tijdstip: $('#post-time').value,
+    club: $('#post-club').value.trim(),
+    bericht: $('#post-msg').value.trim(),
+    ttl_hours: POST_TTL,
+  };
+  if (POST_TYPE === 'direct') body.to_id = +$('#post-to').value;
+  else body.visibility = POST_VIS;
+  try{
+    await api('/api/requests/send',{method:'POST',body});
+    hideModal('modal-new');
+    toast(POST_TYPE==='direct' ? '✅ Uitdaging verzonden!' : '✅ Open post geplaatst!');
+    loadPosts(); loadCounts();
+    switchView('posts');
+  }catch(e){ toast(e.message, true); }
+});
+
+function quickInvite(uid){ openNewPostModal(uid); }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   POSTS VIEW (inbox / open / sent)
+   ═════════════════════════════════════════════════════════════════════════════ */
+let POST_TAB = 'inbox';
+$('#tab-inbox').addEventListener('click', ()=>switchPostTab('inbox'));
+$('#tab-open').addEventListener('click',  ()=>switchPostTab('open'));
+$('#tab-sent').addEventListener('click',  ()=>switchPostTab('sent'));
+
+function switchPostTab(t){
+  POST_TAB = t;
+  ['inbox','open','sent'].forEach(x=>{
+    $('#tab-'+x).classList.toggle('on', x===t);
+    $('#pane-'+x).style.display = x===t ? '' : 'none';
+  });
+}
+
+async function loadPosts(){
+  try{
+    const [incoming, posts, outgoing] = await Promise.all([
+      api('/api/requests/incoming'),
+      api('/api/posts'),
+      api('/api/requests/outgoing'),
+    ]);
+    CACHE.incoming = incoming; CACHE.posts = posts; CACHE.outgoing = outgoing;
+    renderInbox(); renderOpenPosts(); renderSent();
+    $('#cnt-inbox').textContent = incoming.length;
+    $('#cnt-open').textContent  = posts.length;
+    $$('.nav-btn[data-view=posts]')[0].classList.toggle('has-unread', incoming.length>0);
+  }catch(e){ console.error(e); }
+}
+
+function visBadge(v){
+  const map={everyone:['vis-everyone','🌍 Iedereen'],klasse:['vis-klasse','🎾 Klasse'],
+             nearby:['vis-nearby','📍 Nabij'],direct:['vis-direct','🎯 Direct']};
+  const [c,t] = map[v] || map.direct;
+  return `<span class="vis-badge ${c}">${t}</span>`;
+}
+
+function renderInbox(){
+  const c = $('#pane-inbox');
+  if (!CACHE.incoming.length){ c.innerHTML = '<div class="empty">Geen aanvragen ontvangen.</div>'; return; }
+  c.innerHTML = CACHE.incoming.map(r=>{
+    const exp = timeLeft(r.expires_at);
+    const avBg = r.from_photo ? `style="background-image:url('${r.from_photo}')"`:'';
+    return `<div class="post-card">
+      <div class="post-head">
+        <div class="av" ${avBg}>${r.from_photo?'':initials(r.from_name)}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(r.from_name)} <span class="k-badge">${r.from_klasse}</span></div>
+          <div class="meta">${escapeHtml(r.from_city||'')} · ${fmtTime(r.created_at)} geleden</div>
+        </div>
+        ${visBadge(r.visibility)}
+      </div>
+      ${r.bericht ? `<div class="post-body">${escapeHtml(r.bericht)}</div>` : ''}
+      <div class="post-meta">
+        ${r.datum ? `<span>📅 ${fmtDate(r.datum)} ${escapeHtml(r.tijdstip||'')}</span>` : ''}
+        ${r.club ? `<span>🎾 ${escapeHtml(r.club)}</span>` : ''}
+        ${exp ? `<span class="expiry ${exp.urgent?'urgent':''}">⏱ vervalt ${exp.text}</span>`:''}
+      </div>
+      <div class="post-actions">
+        <button class="btn ghost sm" onclick="declineReq(${r.id})">Afwijzen</button>
+        <button class="btn sm" style="flex:1" onclick="acceptReq(${r.id})">✅ Accepteren</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderOpenPosts(){
+  const c = $('#pane-open');
+  if (!CACHE.posts.length){ c.innerHTML = '<div class="empty">Geen open posts binnen jouw zicht.<br>Tik op "+" om er zelf eentje te plaatsen.</div>'; return; }
+  c.innerHTML = CACHE.posts.map(r=>{
+    const exp = timeLeft(r.expires_at);
+    const avBg = r.from_photo ? `style="background-image:url('${r.from_photo}')"`:'';
+    return `<div class="post-card">
+      <div class="post-head">
+        <div class="av" ${avBg}>${r.from_photo?'':initials(r.from_name)}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(r.from_name)} <span class="k-badge">${r.from_klasse}</span></div>
+          <div class="meta">${escapeHtml(r.from_city||'')} · ${r.dist} km · ${fmtTime(r.created_at)} geleden</div>
+        </div>
+        ${visBadge(r.visibility)}
+      </div>
+      ${r.bericht ? `<div class="post-body">${escapeHtml(r.bericht)}</div>` : ''}
+      <div class="post-meta">
+        ${r.datum ? `<span>📅 ${fmtDate(r.datum)} ${escapeHtml(r.tijdstip||'')}</span>` : ''}
+        ${r.club ? `<span>🎾 ${escapeHtml(r.club)}</span>` : ''}
+        ${exp ? `<span class="expiry ${exp.urgent?'urgent':''}">⏱ ${exp.text}</span>`:''}
+      </div>
+      <div class="post-actions">
+        <button class="btn ghost sm" onclick="openPublicProfile(${r.from_id})">Bekijk profiel</button>
+        <button class="btn lime sm" style="flex:1" onclick="acceptReq(${r.id})">🎾 Ik doe mee!</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSent(){
+  const c = $('#pane-sent');
+  if (!CACHE.outgoing.length){ c.innerHTML = '<div class="empty">Nog niets verzonden.</div>'; return; }
+  c.innerHTML = CACHE.outgoing.map(r=>{
+    const exp = timeLeft(r.expires_at);
+    const statusColors = {pending:'var(--amber)',accepted:'var(--g)',declined:'var(--red)',expired:'var(--muted)',cancelled:'var(--muted)'};
+    const statusLabels = {pending:'Wachtend',accepted:'Geaccepteerd',declined:'Afgewezen',expired:'Verlopen',cancelled:'Geannuleerd'};
+    return `<div class="post-card">
+      <div class="post-head">
+        <div class="info">
+          <div class="name">${r.to_id ? '→ '+escapeHtml(r.to_name||'?') : '📣 Open post'}</div>
+          <div class="meta" style="color:${statusColors[r.status]||'var(--muted)'}">●  ${statusLabels[r.status]||r.status}</div>
+        </div>
+        ${visBadge(r.visibility)}
+      </div>
+      ${r.bericht ? `<div class="post-body">${escapeHtml(r.bericht)}</div>`:''}
+      <div class="post-meta">
+        ${r.datum ? `<span>📅 ${fmtDate(r.datum)} ${escapeHtml(r.tijdstip||'')}</span>`:''}
+        ${r.club ? `<span>🎾 ${escapeHtml(r.club)}</span>`:''}
+        ${exp && r.status==='pending' ? `<span class="expiry ${exp.urgent?'urgent':''}">⏱ ${exp.text}</span>`:''}
+      </div>
+      ${r.status==='pending' ? `<div class="post-actions"><button class="btn ghost red sm" onclick="cancelReq(${r.id})">Annuleren</button></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function acceptReq(id){
+  try{
+    const res = await api(`/api/requests/${id}/accept`,{method:'POST'});
+    toast('🎾 Match geboekt! Chat geopend.');
+    loadPosts(); loadCounts();
+    if (res && res.opponent_id){
+      switchView('chat');
+      setTimeout(()=>openChat(res.opponent_id), 200);
+    }
+  }catch(e){ toast(e.message,true); }
+}
+async function declineReq(id){
+  if (!confirm('Aanvraag afwijzen?')) return;
+  try{ await api(`/api/requests/${id}/decline`,{method:'POST',body:{reason:''}}); loadPosts(); loadCounts(); }
+  catch(e){ toast(e.message,true); }
+}
+async function cancelReq(id){
+  if (!confirm('Annuleren?')) return;
+  try{ await api(`/api/requests/${id}/cancel`,{method:'POST'}); loadPosts(); loadCounts(); }
+  catch(e){ toast(e.message,true); }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   CHAT
+   ═════════════════════════════════════════════════════════════════════════════ */
+async function loadChats(){
+  try{
+    const list = await api('/api/chats');
+    const c = $('#chat-list');
+    if (!list.length){ c.innerHTML = '<div class="empty">Geen gesprekken — chat verschijnt zodra je een match aanvaardt.</div>'; return; }
+    c.innerHTML = list.map(u=>{
+      const avBg = u.photo ? `style="background-image:url('${u.photo}')"`:'';
+      return `<div class="chat-item" onclick="openChat(${u.id})">
+        <div class="av" ${avBg}>${u.photo?'':initials(u.name)}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(u.name)} <span class="k-badge">${u.klasse}</span></div>
+          <div class="prev">${escapeHtml(u.preview||'…')}</div>
+        </div>
+        ${u.unread ? `<div class="unread">${u.unread}</div>`:`<div style="font-size:11px;color:var(--muted)">${fmtTime(u.last_at)}</div>`}
+      </div>`;
+    }).join('');
+  }catch(e){ console.error(e); }
+}
+
+async function openChat(uid){
+  CURRENT_CHAT = uid;
+  $('#chat-list-pane').style.display='none';
+  $('#chat-view-pane').style.display='flex';
+  try{
+    const u = await api(`/api/users/${uid}/profile`);
+    $('#chat-other-name').textContent = u.name;
+    $('#chat-other-sub').textContent = u.klasse + ' · ' + (u.city||'');
+    const avBg = u.photo ? `url('${u.photo}')` : '';
+    $('#chat-other-av').style.backgroundImage = avBg;
+    $('#chat-other-av').textContent = u.photo ? '' : initials(u.name);
+  }catch(e){}
+  await refreshChat(uid);
+}
+
+async function refreshChat(uid){
+  try{
+    const msgs = await api(`/api/chats/${uid}/messages`);
+    const s = $('#chat-stream');
+    s.innerHTML = msgs.map(m=>{
+      const mine = m.from_id === ME.id;
+      return `<div class="msg ${mine?'mine':'theirs'}">${escapeHtml(m.body)}<span class="time">${fmtTime(m.created_at)}</span></div>`;
+    }).join('');
+    s.scrollTop = s.scrollHeight;
+  }catch(e){ console.error(e); }
+}
+
+$('#chat-back').addEventListener('click', ()=>{
+  CURRENT_CHAT = null;
+  $('#chat-list-pane').style.display=''; $('#chat-view-pane').style.display='none';
+  loadChats();
+});
+
+$('#chat-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const inp = $('#chat-input'); const body = inp.value.trim();
+  if (!body || !CURRENT_CHAT) return;
+  inp.value='';
+  try{ await api(`/api/chats/${CURRENT_CHAT}/send`,{method:'POST',body:{body}}); refreshChat(CURRENT_CHAT); }
+  catch(e){ toast(e.message,true); }
+});
+
+$('#chat-block').addEventListener('click', ()=>{
+  if (!CURRENT_CHAT) return;
+  if (confirm('Speler blokkeren?')) blockUser(CURRENT_CHAT);
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   HISTORY + PENDING + RANKINGS
+   ═════════════════════════════════════════════════════════════════════════════ */
+async function loadHistory(){
+  try{
+    const [pending, hist, rank] = await Promise.all([
+      api('/api/matches/pending'),
+      api('/api/history'),
+      api('/api/rankings'),
+    ]);
+    CACHE.pending = pending; CACHE.history = hist; CACHE.rankings = rank;
+    $('#cnt-pending').textContent = pending.length;
+    renderPending(); renderHistoryList(); renderRanking();
+    updateStats(hist);
+  }catch(e){ console.error(e); }
+}
+
+function renderPending(){
+  const c = $('#pending-list');
+  if (!CACHE.pending.length){ c.innerHTML='<div class="empty">Geen openstaande matches.</div>'; return; }
+  c.innerHTML = CACHE.pending.map(m=>{
+    const other = m.player1_id===ME.id ? {n:m.p2_name,p:m.p2_photo,id:m.player2_id} : {n:m.p1_name,p:m.p1_photo,id:m.player1_id};
+    return `<div class="match-card">
+      <div class="match-vs">${escapeHtml(ME.name)} <span class="vs">vs</span> ${escapeHtml(other.n)}</div>
+      <div class="match-meta">📅 ${fmtDate(m.datum||'')} · ${escapeHtml(m.club||'')}</div>
+      <button class="btn lime sm" onclick="openScoreModal(${m.id}, ${other.id}, '${escapeHtml(other.n)}')">📊 Score invoeren</button>
+    </div>`;
+  }).join('');
+}
+
+function renderHistoryList(){
+  const c = $('#history-list');
+  if (!CACHE.history.length){ c.innerHTML='<div class="empty">Geen matches gespeeld.</div>'; return; }
+  c.innerHTML = CACHE.history.map(m=>{
+    const iWon = m.winner_id === ME.id;
+    const other = m.player1_id===ME.id ? m.p2_name : m.p1_name;
+    return `<div class="match-card">
+      <div class="match-vs">${escapeHtml(other)} <span class="vs">·</span>
+        <span class="${iWon?'win':'loss'}">${iWon?'WINST':'VERLIES'}</span></div>
+      <div class="score-line">${escapeHtml(m.score||'')}</div>
+      <div class="match-meta">📅 ${fmtDate(m.datum||'')} · ${escapeHtml(m.club||'')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRanking(){
+  const c = $('#ranking-list');
+  c.innerHTML = CACHE.rankings.slice(0,10).map((r,i)=>{
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+    const avBg = r.photo ? `style="background-image:url('${r.photo}')"`:'';
+    return `<div class="card" onclick="openPublicProfile(${r.id})">
+      <div style="font-family:var(--fd);font-size:22px;color:var(--g);min-width:32px">${medal}</div>
+      <div class="av" ${avBg}>${r.photo?'':initials(r.name)}</div>
+      <div class="info">
+        <div class="name">${escapeHtml(r.name)} <span class="k-badge">${r.klasse}</span></div>
+        <div class="meta"><b>${r.punten} pt</b> · ${r.wins||0}W / ${r.matches||0} matches</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats(hist){
+  const wins = hist.filter(m=>m.winner_id===ME.id).length;
+  const total = hist.length;
+  $('#stat-m').textContent = total;
+  $('#stat-w').textContent = wins;
+  $('#stat-r').textContent = total ? Math.round(100*wins/total)+'%' : '0%';
+}
+
+/* score modal */
+let SCORE_MATCH=null, SCORE_OTHER=null, SCORE_WINNER=null;
+function openScoreModal(matchId, otherId, otherName){
+  SCORE_MATCH = matchId; SCORE_OTHER = otherId; SCORE_WINNER = null;
+  $('#score-sub').textContent = `Wie won er tegen ${otherName}?`;
+  $('#score-winner').innerHTML = `
+    <div class="opt-card" data-w="${ME.id}"><div class="ic">👤</div><div class="ti">Ikzelf</div></div>
+    <div class="opt-card" data-w="${otherId}"><div class="ic">🤝</div><div class="ti">${escapeHtml(otherName)}</div></div>`;
+  $$('#score-winner .opt-card').forEach(c=>c.addEventListener('click', ()=>{
+    SCORE_WINNER = +c.dataset.w;
+    $$('#score-winner .opt-card').forEach(x=>x.classList.toggle('on', x===c));
+  }));
+  $('#score-text').value = '';
+  showModal('modal-score');
+}
+$('#score-submit').addEventListener('click', async ()=>{
+  if (!SCORE_WINNER){ toast('Kies de winnaar', true); return; }
+  const score = $('#score-text').value.trim();
+  if (!score){ toast('Vul de score in', true); return; }
+  try{
+    await api('/api/match/record',{method:'POST',body:{match_id:SCORE_MATCH,score,winner_id:SCORE_WINNER}});
+    hideModal('modal-score'); toast('Score opgeslagen'); loadHistory();
+  }catch(e){ toast(e.message,true); }
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PROFILE
+   ═════════════════════════════════════════════════════════════════════════════ */
+$('#prof-av').addEventListener('click', ()=>{
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/jpeg,image/png,image/webp';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 800_000){ toast('Bestand te groot (>800KB)', true); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try{
+        await api('/api/me/photo',{method:'PUT',body:{data:reader.result}});
+        ME.photo = reader.result; renderMe(); toast('Foto opgeslagen');
+      }catch(e){ toast(e.message,true); }
+    };
+    reader.readAsDataURL(f);
+  };
+  inp.click();
+});
+
+$('#save-profile').addEventListener('click', async ()=>{
+  try{
+    const k = $('#prof-klasse').value; const bio = $('#prof-bio').value; const city = $('#prof-city').value;
+    if (k !== ME.klasse) await api('/api/me/klasse',{method:'PUT',body:{klasse:k}});
+    await api('/api/me/profile',{method:'PUT',body:{bio}});
+    if (city !== ME.city) await api('/api/me/location',{method:'PUT',body:{lat:ME.lat||0,lng:ME.lng||0,city}});
+    ME.klasse=k; ME.bio=bio; ME.city=city;
+    renderMe(); toast('Profiel opgeslagen');
+  }catch(e){ toast(e.message,true); }
+});
+
+$('#online-toggle').addEventListener('click', toggleAvail);
+$('#set-avail').addEventListener('click', toggleAvail);
+async function toggleAvail(){
+  ME.available = ME.available ? 0 : 1;
+  try{ await api('/api/me/available',{method:'PUT',body:{available:!!ME.available}}); renderMe(); toast(ME.available?'🟢 Je bent zichtbaar':'⚪ Offline'); loadPlayers(); loadDensity(); }
+  catch(e){ toast(e.message,true); ME.available = ME.available?0:1; renderMe(); }
+}
+
+$('#set-loc').addEventListener('click', async ()=>{
+  if (!navigator.geolocation){ toast('GPS niet beschikbaar',true); return; }
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    try{
+      await api('/api/me/location',{method:'PUT',body:{lat,lng,city:ME.city||''}});
+      ME.lat=lat; ME.lng=lng;
+      toast('Locatie geüpdatet');
+      if (MAP){ MAP.setView([lat,lng], 12); }
+      loadPlayers(); loadDensity();
+    }catch(e){ toast(e.message,true); }
+  }, ()=>toast('GPS geweigerd',true), {timeout:7000});
+});
+
+$('#logout').addEventListener('click', logout);
+
+$('#delete-account').addEventListener('click', async ()=>{
+  if (!confirm('Account permanent verwijderen? Alle data wordt gewist. Dit kan niet ongedaan worden.')) return;
+  if (!confirm('Echt zeker?')) return;
+  try{ await api('/api/me',{method:'DELETE'}); toast('Account verwijderd'); logout(); }
+  catch(e){ toast(e.message,true); }
+});
+
+/* slots grid */
+const DAYS = ['Ma','Di','Wo','Do','Vr','Za','Zo'];
+const HOURS = [9,12,15,18,21]; // simpele 3-uur-blokken: 9-12, 12-15, 15-18, 18-21
+let SLOT_STATE = {}; // key "dh" → bool
+
+async function loadSlots(){
+  try{
+    const slots = await api('/api/me/slots');
+    SLOT_STATE = {};
+    slots.forEach(s=>{
+      for (let h=s.start_hour; h<s.end_hour; h+=3){
+        SLOT_STATE[`${s.day_of_week}-${h}`] = true;
+      }
+    });
+    renderSlotGrid();
+  }catch(e){ console.error(e); }
+}
+function renderSlotGrid(){
+  const g = $('#slot-grid');
+  g.innerHTML = '';
+  // Map: dayOfWeek in DB is 0=Mon..6=Sun? In original Python (0..6) probably 0=Mon based on demo data
+  for (let d=0; d<7; d++){
+    const col = el('div','slot-day');
+    col.innerHTML = `<div class="dn">${DAYS[d]}</div>`;
+    for (let i=0; i<HOURS.length-1; i++){
+      const sh = HOURS[i], eh = HOURS[i+1];
+      const key = `${d}-${sh}`;
+      const cell = el('div','slot-cell'+(SLOT_STATE[key]?' on':''),`${sh}-${eh}`);
+      cell.dataset.k = key;
+      cell.addEventListener('click', ()=>{
+        SLOT_STATE[key] = !SLOT_STATE[key];
+        cell.classList.toggle('on');
+      });
+      col.appendChild(cell);
+    }
+    g.appendChild(col);
+  }
+}
+$('#save-slots').addEventListener('click', async ()=>{
+  const slots = [];
+  for (const k of Object.keys(SLOT_STATE)){
+    if (!SLOT_STATE[k]) continue;
+    const [d,sh] = k.split('-').map(Number);
+    slots.push({day_of_week:d, start_hour:sh, end_hour:sh+3});
+  }
+  try{ await api('/api/me/slots',{method:'PUT',body:{slots}}); toast('Beschikbaarheid opgeslagen'); }
+  catch(e){ toast(e.message,true); }
+});
+
+function switchView(v){
+  CURRENT_VIEW = v;
+  $$('.view').forEach(el=>el.classList.toggle('active', el.id === 'view-'+v));
+  $$('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view === v));
+  $('#fab-new').style.display = (v==='home' || v==='posts') ? '' : 'none';
+  if (v==='posts')   loadPosts();
+  if (v==='chat')    { CURRENT_CHAT=null; $('#chat-list-pane').style.display=''; $('#chat-view-pane').style.display='none'; loadChats(); }
+  if (v==='friends') loadFriends();
+  if (v==='profile') { loadSlots(); loadHistory(); }
+  if (v==='home' && MAP) setTimeout(()=>MAP.invalidateSize(), 100);
+}
+$$('.nav-btn').forEach(b=>b.addEventListener('click', ()=>switchView(b.dataset.view)));
+
+async function loadCounts(){
+  try{
+    const r1 = await api('/api/requests/incoming');
+    const r2 = await api('/api/friends/incoming');
+    const np = $$('.nav-btn[data-view=posts]')[0];
+    if (np) np.classList.toggle('has-unread', r1.length>0);
+    const nf = $$('.nav-btn[data-view=friends]')[0];
+    if (nf) nf.classList.toggle('has-unread', r2.length>0);
+  }catch(e){}
+}
+
+function showModal(id){ $('#'+id).classList.add('show'); document.body.style.overflow='hidden'; }
+function hideModal(id){ $('#'+id).classList.remove('show'); document.body.style.overflow=''; }
+$$('.modal-bg').forEach(bg=>bg.addEventListener('click', e=>{
+  if (e.target === bg){ bg.classList.remove('show'); document.body.style.overflow=''; }
+}));
+
+if (TOKEN){ boot().catch(()=>logout()); } else { showAuth(); }
+setInterval(()=>{ if (TOKEN && ME) loadCounts(); }, 60000);
+</script>
+</body></html>
