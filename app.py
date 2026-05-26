@@ -204,52 +204,29 @@ def init_db():
                        "VALUES (?,?,?,?,?,?,?)", (nm, city, lat, lng, courts, addr, hrs))
     db.commit()
 
-    # Seed demo-users alleen als DB leeg is
-    if db.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0:
-        demo = [
-            ("Sven De Wolf","sven@demo.com","demo1234","10",6,"Boechout",51.1612,4.4870,1),
-            ("Laura Martens","laura@demo.com","demo1234","5",11,"Mortsel",51.1685,4.4565,1),
-            ("Nathalie Huys","nathalie@demo.com","demo1234","15",4,"Hove",51.1547,4.4720,1),
-            ("Koen Baert","koen@demo.com","demo1234","NC",55,"Edegem",51.1556,4.4430,1),
-            ("Joris Vandenberghe","joris@demo.com","demo1234","10",9,"Kontich",51.1350,4.4495,1),
-            ("An Declercq","an@demo.com","demo1234","5",18,"Berchem",51.1980,4.4205,1),
-            ("Pieter Janssens","pieter@demo.com","demo1234","10",13,"Wilrijk",51.1710,4.3950,1),
-            ("Sofie Vermeulen","sofie@demo.com","demo1234","3",27,"Lier",51.1300,4.5650,1),
-            ("Eline Peeters","eline@demo.com","demo1234","10",8,"Boechout",51.1590,4.4910,1),
-            ("Wouter Claes","wouter@demo.com","demo1234","5",24,"Mortsel",51.1670,4.4600,1),
-            ("Lien Maes","lien@demo.com","demo1234","3",30,"Borsbeek",51.1960,4.4670,1),
-            ("Gert Smets","gert@demo.com","demo1234","NC",48,"Schoten",51.2520,4.5000,1),
-            ("Maarten De Vos","maarten@demo.com","demo1234","65",15,"Antwerpen",51.2150,4.4080,1),
-            ("Inge Verbeeck","inge@demo.com","demo1234","5",12,"Mortsel",51.1665,4.4520,1),
-        ]
-        for name,email,pw,kl,pts,city,lat,lng,avail in demo:
-            h = bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
-            db.execute(
-                "INSERT INTO users (name,email,password,klasse,punten,city,lat,lng,available) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
-                (name,email,h,kl,pts,city,lat,lng,avail))
-        db.commit()
-        db.executemany(
-            "INSERT INTO matches (player1_id,player2_id,score,winner_id,club,datum,klasse) "
-            "VALUES (?,?,?,?,?,?,?)", [
-                (1,2,"6-3, 6-4",1,"Oxaco Tennis","2026-04-24","10"),
-                (1,3,"4-6, 3-6",3,"TC Hove","2026-04-19","15"),
-                (1,9,"6-2, 6-1",1,"Oxaco Tennis","2026-03-29","10"),
-                (1,5,"7-5, 6-4",1,"Blauwe Regen","2026-03-15","10"),
-                (2,9,"6-3, 6-2",2,"TC Zevenbergen","2026-04-15","5"),
-                (13,14,"6-4, 7-6",13,"Oxaco Tennis","2026-04-20","65"),
-            ])
-        db.executemany(
-            "INSERT INTO availability_slots (user_id,day_of_week,start_hour,end_hour) VALUES (?,?,?,?)", [
-                (1,1,18,21),(1,3,18,21),(1,5,9,12),(1,6,9,12),
-                (2,1,17,20),(2,3,17,21),(2,6,10,13),
-                (3,1,18,21),(3,4,18,21),(3,6,9,12),
-                (5,0,18,21),(5,3,18,21),(5,5,10,13),
-                (6,1,19,22),(6,6,14,18),
-                (7,0,18,20),(7,2,18,21),(7,4,18,20),
-                (9,1,18,21),(9,3,18,21),(9,5,9,12),
-                (13,1,18,21),(13,4,18,21),
-            ])
+    # Verwijder alle demo-accounts (eenmalige cleanup, ook op bestaande databases)
+    demo_emails = [
+        'sven@demo.com','laura@demo.com','nathalie@demo.com','koen@demo.com',
+        'joris@demo.com','an@demo.com','pieter@demo.com','sofie@demo.com',
+        'bart@demo.com','eline@demo.com','wouter@demo.com','caro@demo.com',
+        'lien@demo.com','gert@demo.com','maarten@demo.com','inge@demo.com',
+        'tom@demo.com','demo@test.com',
+    ]
+    ph = ",".join("?" * len(demo_emails))
+    demo_ids = [r["id"] for r in db.execute(
+        f"SELECT id FROM users WHERE email IN ({ph})", demo_emails).fetchall()]
+    if demo_ids:
+        id_ph = ",".join("?" * len(demo_ids))
+        db.execute(f"DELETE FROM matches WHERE player1_id IN ({id_ph}) OR player2_id IN ({id_ph})",
+                   demo_ids + demo_ids)
+        db.execute(f"DELETE FROM requests WHERE from_id IN ({id_ph}) OR to_id IN ({id_ph})",
+                   demo_ids + demo_ids)
+        db.execute(f"DELETE FROM availability_slots WHERE user_id IN ({id_ph})", demo_ids)
+        db.execute(f"DELETE FROM chats WHERE player1_id IN ({id_ph}) OR player2_id IN ({id_ph})",
+                   demo_ids + demo_ids)
+        db.execute(f"DELETE FROM blocks WHERE blocker_id IN ({id_ph}) OR blocked_id IN ({id_ph})",
+                   demo_ids + demo_ids)
+        db.execute(f"DELETE FROM users WHERE id IN ({id_ph})", demo_ids)
         db.commit()
     db.close()
 
